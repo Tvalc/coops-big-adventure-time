@@ -1,546 +1,481 @@
-// =================== Coop Sprite Animation Helper ===================
-const COOP_ANIMATION_CONFIG = {
-  FRAME_WIDTH: 32,
-  FRAME_HEIGHT: 48,
-  WALK_FRAME_COUNT: 5,
-  WALK_FRAME_DURATION: 140, // ms per frame: SNES pacing ~0.12-0.16s
-  IMAGE_URLS: [
-    // RESTORED: Original Coop walk cycle image URLs (left-facing, SNES-style, 32x48 PNG)
-    "https://dcnmwoxzefwqmvvkpqap.supabase.co/storage/v1/object/public/sprite-studio-exports/0f84fe06-5c42-40c3-b563-1a28d18f37cc/library/Coop_walk_left_1_1753755399811.png",
-    "https://dcnmwoxzefwqmvvkpqap.supabase.co/storage/v1/object/public/sprite-studio-exports/0f84fe06-5c42-40c3-b563-1a28d18f37cc/library/Coop_walk_left_2_1753755415493.png",
-    "https://dcnmwoxzefwqmvvkpqap.supabase.co/storage/v1/object/public/sprite-studio-exports/0f84fe06-5c42-40c3-b563-1a28d18f37cc/library/Coop_walk_left_3_1753755438859.png",
-    "https://dcnmwoxzefwqmvvkpqap.supabase.co/storage/v1/object/public/sprite-studio-exports/0f84fe06-5c42-40c3-b563-1a28d18f37cc/library/Coop_walk_left_4_1753755459773.png",
-    "https://dcnmwoxzefwqmvvkpqap.supabase.co/storage/v1/object/public/sprite-studio-exports/0f84fe06-5c42-40c3-b563-1a28d18f37cc/library/Coop_walk_left_5_1753755468791.png"
-  ]
-};
+// ========== PLAYER SPRITE LOADING & ANIMATION ==========
+const PLAYER_WALK_LEFT_FRAMES = [
+  'https://dcnmwoxzefwqmvvkpqap.supabase.co/storage/v1/object/public/sprite-studio-exports/0f84fe06-5c42-40c3-b563-1a28d18f37cc/library/Coop_walk_left_1_1753755399811.png',
+  'https://dcnmwoxzefwqmvvkpqap.supabase.co/storage/v1/object/public/sprite-studio-exports/0f84fe06-5c42-40c3-b563-1a28d18f37cc/library/Coop_walk_left_2_1753755415493.png',
+  'https://dcnmwoxzefwqmvvkpqap.supabase.co/storage/v1/object/public/sprite-studio-exports/0f84fe06-5c42-40c3-b563-1a28d18f37cc/library/Coop_walk_left_3_1753755438859.png',
+  'https://dcnmwoxzefwqmvvkpqap.supabase.co/storage/v1/object/public/sprite-studio-exports/0f84fe06-5c42-40c3-b563-1a28d18f37cc/library/Coop_walk_left_4_1753755459773.png',
+  'https://dcnmwoxzefwqmvvkpqap.supabase.co/storage/v1/object/public/sprite-studio-exports/0f84fe06-5c42-40c3-b563-1a28d18f37cc/library/Coop_walk_left_5_1753755468791.png'
+];
+window.PlayerSpriteImages = PLAYER_WALK_LEFT_FRAMES.map(url => {
+  const img = new window.Image();
+  img.src = url;
+  return img;
+});
 
-/**
- * Preloads an array of images and invokes callback when all loaded.
- * Returns: Array of loaded Image objects (order preserved).
- */
-function preloadImages(urls, cb) {
-  let loaded = 0;
-  const images = [];
-  for (let i = 0; i < urls.length; ++i) {
-    const img = new window.Image();
-    img.src = urls[i];
-    img.onload = () => {
-      loaded++;
-      if (loaded === urls.length && typeof cb === "function") cb(images);
-    };
-    images[i] = img;
-  }
-  return images;
+// ========== ENEMY SPRITE ANIMATION LOADING ==========
+
+const ENEMY_ANIMATION_FRAMES = [
+  'https://dcnmwoxzefwqmvvkpqap.supabase.co/storage/v1/object/public/sprite-studio-exports/0f84fe06-5c42-40c3-b563-1a28d18f37cc/library/Enemy_Ship_1_1753824654660.png',
+  'https://dcnmwoxzefwqmvvkpqap.supabase.co/storage/v1/object/public/sprite-studio-exports/0f84fe06-5c42-40c3-b563-1a28d18f37cc/library/Enemy_Ship_2_1753824672446.png',
+  'https://dcnmwoxzefwqmvvkpqap.supabase.co/storage/v1/object/public/sprite-studio-exports/0f84fe06-5c42-40c3-b563-1a28d18f37cc/library/Enemy_Ship_3_1753824680227.png',
+  'https://dcnmwoxzefwqmvvkpqap.supabase.co/storage/v1/object/public/sprite-studio-exports/0f84fe06-5c42-40c3-b563-1a28d18f37cc/library/Enemy_Ship_4_1753824688771.png',
+  'https://dcnmwoxzefwqmvvkpqap.supabase.co/storage/v1/object/public/sprite-studio-exports/0f84fe06-5c42-40c3-b563-1a28d18f37cc/library/Enemy_Ship_5_1753824699044.png',
+  'https://dcnmwoxzefwqmvvkpqap.supabase.co/storage/v1/object/public/sprite-studio-exports/0f84fe06-5c42-40c3-b563-1a28d18f37cc/library/Enemy_Ship_6_1753824709971.png',
+  'https://dcnmwoxzefwqmvvkpqap.supabase.co/storage/v1/object/public/sprite-studio-exports/0f84fe06-5c42-40c3-b563-1a28d18f37cc/library/Enemy_Ship_7_1753824720897.png',
+  'https://dcnmwoxzefwqmvvkpqap.supabase.co/storage/v1/object/public/sprite-studio-exports/0f84fe06-5c42-40c3-b563-1a28d18f37cc/library/Enemy_Ship_8_1753824730385.png',
+  'https://dcnmwoxzefwqmvvkpqap.supabase.co/storage/v1/object/public/sprite-studio-exports/0f84fe06-5c42-40c3-b563-1a28d18f37cc/library/Enemy_Ship_9_1753824738269.png'
+];
+window.EnemyAnimationImages = [];
+for (let url of ENEMY_ANIMATION_FRAMES) {
+  const img = new window.Image();
+  img.src = url;
+  window.EnemyAnimationImages.push(img);
 }
 
-// =================== BubbleProjectile Class ===================
-window.BubbleProjectile = class BubbleProjectile {
-  /**
-   * @param {number} x - Initial X position.
-   * @param {number} y - Initial Y position.
-   * @param {number} dir - Direction: 1 for right, -1 for left.
-   */
-  constructor(x, y, dir) {
-    this.x = x;
-    this.y = y;
-    this.radius = 14;
-    this.speed = 8 * dir; // dir: 1 (right), -1 (left)
-    this.vx = this.speed;
-    this.vy = 0;
-    this.lifetime = 1200; // ms
-    this.isDestroyed = false;
-    this.damage = 8; // Match design doc: bubble gun base damage
-  }
-
-  /**
-   * Update projectile position and collision.
-   * @param {Array} enemies - Array of enemy objects.
-   * @param {number} dt - Delta time (ms).
-   */
-  update(enemies, dt) {
-    if (this.isDestroyed) return;
-    this.x += this.vx;
-    this.y += this.vy;
-    this.lifetime -= dt;
-    // Destroy if off-screen
-    if (
-      this.x < -this.radius ||
-      this.x > window.GAME_CONSTANTS.WIDTH + this.radius ||
-      this.lifetime <= 0
-    ) {
-      this.isDestroyed = true;
-      return;
-    }
-    // Collision with enemies
-    for (let e of enemies) {
-      if (e.isAlive) {
-        const dx = e.x - this.x, dy = e.y - this.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < this.radius + e.size / 2) {
-          if (typeof e.takeDamage === "function") {
-            e.takeDamage(this.damage);
-          }
-          this.isDestroyed = true;
-          break;
-        }
-      }
-    }
-  }
-
-  /**
-   * Render the projectile.
-   * @param {CanvasRenderingContext2D} ctx
-   */
-  draw(ctx) {
-    if (this.isDestroyed) return;
-    ctx.save();
-    // Bubble: blue with white highlight
-    ctx.globalAlpha = 0.85;
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-    let grad = ctx.createRadialGradient(
-      this.x, this.y, this.radius * 0.3,
-      this.x, this.y, this.radius
-    );
-    grad.addColorStop(0, "#fff");
-    grad.addColorStop(0.4, "#bbf7ff");
-    grad.addColorStop(1, "#3ec6ff");
-    ctx.fillStyle = grad;
-    ctx.shadowColor = "#0ff";
-    ctx.shadowBlur = 12;
-    ctx.fill();
-    // Highlight
-    ctx.globalAlpha = 0.25;
-    ctx.beginPath();
-    ctx.arc(this.x - this.radius / 3, this.y - this.radius / 3, this.radius / 2.5, 0, Math.PI * 2);
-    ctx.fillStyle = "#fff";
-    ctx.fill();
-    ctx.restore();
-  }
-};
-
-// =================== Player Class ===================
+// ========== PLAYER CLASS ==========
 window.Player = class Player {
-  /**
-   * Creates the player character.
-   * @param {number} x - Initial X position.
-   * @param {number} y - Initial Y position.
-   */
   constructor(x, y) {
-    const C = window.GAME_CONSTANTS.PLAYER;
     this.x = x;
     this.y = y;
-    this.vx = 0;
-    this.vy = 0;
-    this.radius = 36; // Rendered radius, slightly larger than base for hitbox
-    this.grounded = false;
-    this.facing = 1; // 1 = right, -1 = left
-    this.isAttacking = false;
-    this.attackTimer = 0;
-    this.attackArc = C.ATTACK_ARC;
-    this.attackRadius = C.ATTACK_RADIUS * 2;
-    this.attackCooldown = C.ATTACK_COOLDOWN;
-    this.shootCooldown = C.SHOOT_COOLDOWN;
-    this.shootTimer = 0;
-    this.moveSpeed = C.MOVE_SPEED;
-    this.jumpVelocity = C.JUMP_VELOCITY;
-    this.color = C.COLOR;
-    this.projectiles = [];
-    this._walkAnimT = 0;
-    this._walkFrame = 0;
-    this._walkImages = [];
-    this._walkImagesLoaded = false;
-
-    // Player stats
-    this.stats = {
-      hp: C.HP,
-      maxHp: C.HP,
-      attack: 12,
-      bubbleDmg: 8,
-      score: 0,
-      currency: 0
-    };
-
-    // Preload walk cycle images (left-facing, flip for right)
-    this._walkImages = preloadImages(COOP_ANIMATION_CONFIG.IMAGE_URLS, (imgs) => {
-      this._walkImagesLoaded = true;
-    });
-  }
-
-  /**
-   * Resets the player state for a fresh game start or respawn.
-   * (Call on restart if needed)
-   */
-  reset(x, y) {
-    const C = window.GAME_CONSTANTS.PLAYER;
-    this.x = x || 120;
-    this.y = y || (window.GAME_CONSTANTS.GROUND_Y - window.GAME_CONSTANTS.PLAYER.RADIUS);
-    this.vx = 0;
-    this.vy = 0;
+    this.radius = window.GAME_CONSTANTS.PLAYER.RADIUS; // 50% size
+    this.color = window.GAME_CONSTANTS.PLAYER.COLOR;
+    this.speed = window.GAME_CONSTANTS.PLAYER.MOVE_SPEED;
+    this.jumpVel = window.GAME_CONSTANTS.PLAYER.JUMP_VELOCITY;
+    this.velY = 0;
     this.grounded = false;
     this.facing = 1;
-    this.isAttacking = false;
-    this.attackTimer = 0;
-    this.shootTimer = 0;
-    this.projectiles = [];
-    this._walkAnimT = 0;
-    this._walkFrame = 0;
+
     this.stats = {
-      hp: C.HP,
-      maxHp: C.HP,
-      attack: 12,
-      bubbleDmg: 8,
-      score: 0,
-      currency: 0
+      hp: window.GAME_CONSTANTS.PLAYER.HP,
+      maxHp: window.GAME_CONSTANTS.PLAYER.HP,
+      attack: 8,
+      defense: 0,
+      speed: this.speed,
+      jump: this.jumpVel,
+      currency: 0,
+      score: 0
     };
-    // Walk images do not need reload, will be reused if loaded
+
+    // Attack
+    this.attackCooldown = 0;
+    this.attackDelay = window.GAME_CONSTANTS.PLAYER.ATTACK_COOLDOWN;
+
+    // Shoot (Bubble Gun)
+    this.shootCooldown = 0;
+    this.shootDelay = window.GAME_CONSTANTS.PLAYER.SHOOT_COOLDOWN;
+    this.projectiles = [];
+
+    // Animation state
+    this.animFrame = 0;
+    this.animTimer = 0;
+    this.animSpeed = 110; // ms per frame
+    this.isMoving = false;
   }
 
-  /**
-   * Update player position, state, and projectiles.
-   * @param {InputSystem} input
-   * @param {number} dt
-   * @param {Object} world - {enemies}
-   */
-  update(input, dt, world) {
-    // Movement input
-    let left = input.isDown("left"), right = input.isDown("right");
-    let moving = false;
-    if (left && !right) {
-      this.vx = -this.moveSpeed;
-      this.facing = -1;
-      moving = true;
-    } else if (right && !left) {
-      this.vx = this.moveSpeed;
-      this.facing = 1;
-      moving = true;
-    } else {
-      this.vx = 0;
+  jump() {
+    if (this.grounded) {
+      this.velY = -this.jumpVel;
+      this.grounded = false;
     }
+  }
 
-    // Horizontal movement
-    this.x += this.vx;
+  attack(enemies) {
+    if (this.attackCooldown > 0) return false;
+    this.attackCooldown = this.attackDelay;
+
+    let hit = false;
+    const attackRadius = window.GAME_CONSTANTS.PLAYER.ATTACK_RADIUS; // 50% size
+    for (let enemy of enemies) {
+      if (!enemy.isAlive) continue;
+      const dx = enemy.x - this.x;
+      const dy = enemy.y - this.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < attackRadius) {
+        enemy.takeDamage(this.stats.attack, { cause: "melee" });
+        hit = true;
+      }
+    }
+    return hit;
+  }
+
+  shoot() {
+    if (this.shootCooldown > 0) return false;
+    this.shootCooldown = this.shootDelay;
+    // Bubble projectile
+    this.projectiles.push({
+      x: this.x + this.facing * this.radius * 0.6,
+      y: this.y - this.radius * 0.2,
+      vx: 9 * this.facing,
+      vy: -2.5,
+      radius: 7.5, // 50% size
+      life: 52
+    });
+    return true;
+  }
+
+  update(input, dt, world) {
+    // Movement
+    let moveDir = 0;
+    if (input.isDown('left')) moveDir -= 1;
+    if (input.isDown('right')) moveDir += 1;
+    this.facing = moveDir !== 0 ? moveDir : this.facing;
+    this.isMoving = moveDir !== 0;
+
+    this.x += moveDir * this.speed;
+    // Clamp to world bounds
+    this.x = window.Utils.clamp(this.x, this.radius, window.GAME_CONSTANTS.WIDTH - this.radius);
 
     // Gravity
-    this.vy += window.GAME_CONSTANTS.GRAVITY;
-    this.y += this.vy;
+    this.velY += window.GAME_CONSTANTS.GRAVITY;
+    this.y += this.velY;
 
-    // Floor collision
-    if (this.y + this.radius > window.GAME_CONSTANTS.GROUND_Y + 24) {
-      this.y = window.GAME_CONSTANTS.GROUND_Y + 24 - this.radius;
-      this.vy = 0;
+    // Ground collision
+    if (this.y + this.radius > window.GAME_CONSTANTS.GROUND_Y + 32) {
+      this.y = window.GAME_CONSTANTS.GROUND_Y + 32 - this.radius;
+      this.velY = 0;
       this.grounded = true;
     } else {
       this.grounded = false;
     }
 
-    // Clamp to world bounds
-    this.x = Math.max(this.radius, Math.min(window.GAME_CONSTANTS.WIDTH - this.radius, this.x));
-    this.y = Math.min(window.GAME_CONSTANTS.GROUND_Y + 24 - this.radius, this.y);
-
     // Attack cooldown
-    if (this.attackTimer > 0) this.attackTimer -= dt;
-    if (this.shootTimer > 0) this.shootTimer -= dt;
+    if (this.attackCooldown > 0) this.attackCooldown -= dt;
+    if (this.attackCooldown < 0) this.attackCooldown = 0;
 
-    // Update projectiles
+    // Shoot cooldown
+    if (this.shootCooldown > 0) this.shootCooldown -= dt;
+    if (this.shootCooldown < 0) this.shootCooldown = 0;
+
+    // Projectiles
     for (let p of this.projectiles) {
-      p.update(world.enemies, dt);
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.16;
+      p.life -= 1;
     }
-    // Remove destroyed
-    this.projectiles = this.projectiles.filter(p => !p.isDestroyed);
+    // Remove expired projectiles
+    this.projectiles = this.projectiles.filter(p => p.life > 0);
 
-    // Walk animation
-    if (moving) {
-      this._walkAnimT += dt;
-      if (this._walkAnimT > COOP_ANIMATION_CONFIG.WALK_FRAME_DURATION) {
-        this._walkFrame = (this._walkFrame + 1) % COOP_ANIMATION_CONFIG.WALK_FRAME_COUNT;
-        this._walkAnimT = 0;
-      }
-    } else {
-      this._walkFrame = 0;
-      this._walkAnimT = 0;
-    }
-  }
-
-  /**
-   * Player jump action.
-   */
-  jump() {
-    if (this.grounded) {
-      this.vy = -this.jumpVelocity;
-      this.grounded = false;
-    }
-  }
-
-  /**
-   * Player attack action - melee swing.
-   * @param {Array} enemies
-   * @returns {boolean} True if any enemy was hit
-   */
-  attack(enemies) {
-    if (this.attackTimer > 0) return false;
-    this.attackTimer = this.attackCooldown;
-    let hit = false;
-    // Attack arc: from facing direction, in front of the player
-    let px = this.x + this.facing * this.radius * 0.7;
-    let py = this.y;
-    let arcCenter = Math.atan2(0, this.facing); // 0 or PI
-
-    for (let e of enemies) {
-      if (!e.isAlive) continue;
-      let dx = e.x - px, dy = e.y - py;
-      let dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < this.attackRadius + e.size / 2) {
-        // Arc check
-        let ang = Math.atan2(dy, dx);
-        let diff = Math.abs(window.Utils.angleDiff(arcCenter, ang));
-        if (diff < this.attackArc / 2) {
-          if (typeof e.takeDamage === "function") {
-            e.takeDamage(this.stats.attack);
-            hit = true;
+    // Projectile collision with enemies
+    if (world && world.enemies) {
+      for (let p of this.projectiles) {
+        for (let e of world.enemies) {
+          if (!e.isAlive) continue;
+          const dx = e.x - p.x;
+          const dy = e.y - p.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < e.size + p.radius) {
+            e.takeDamage(this.stats.attack * 0.7, { cause: "projectile" });
+            p.life = 0;
           }
         }
       }
     }
-    this.isAttacking = true;
-    setTimeout(() => { this.isAttacking = false; }, 180);
-    return hit;
-  }
 
-  /**
-   * Player shoot action - fires a bubble projectile.
-   */
-  shoot() {
-    if (this.shootTimer > 0) return false;
-    this.shootTimer = this.shootCooldown;
-    // Bubble appears slightly in front of player
-    let px = this.x + this.facing * (this.radius - 10);
-    let py = this.y - 10;
-    let proj = new window.BubbleProjectile(px, py, this.facing);
-    this.projectiles.push(proj);
-    return true;
-  }
-
-  /**
-   * Render the player and projectiles.
-   * @param {CanvasRenderingContext2D} ctx
-   */
-  draw(ctx) {
-    // Draw projectiles
-    for (let p of this.projectiles) {
-      p.draw(ctx);
+    // ===== Player Animation Logic =====
+    if (this.isMoving) {
+      this.animTimer += dt;
+      if (this.animTimer > this.animSpeed) {
+        this.animTimer = 0;
+        this.animFrame = (this.animFrame + 1) % window.PlayerSpriteImages.length;
+      }
+    } else {
+      this.animFrame = 0; // Idle frame
+      this.animTimer = 0;
     }
+  }
 
-    ctx.save();
-
-    // Sprite animation if loaded
-    if (this._walkImagesLoaded && this._walkImages[this._walkFrame]) {
+  draw(ctx) {
+    // Draw player sprite animation frames and mirror if facing right
+    const frames = window.PlayerSpriteImages;
+    let img = frames[this.animFrame];
+    if (img && img.complete && img.naturalWidth && img.naturalHeight) {
       ctx.save();
-      ctx.translate(this.x, this.y - 8);
-      ctx.scale(-this.facing, 1); // <-- CHANGED: flip horizontally when facing right
-      ctx.drawImage(
-        this._walkImages[this._walkFrame],
-        -COOP_ANIMATION_CONFIG.FRAME_WIDTH / 2,
-        -COOP_ANIMATION_CONFIG.FRAME_HEIGHT / 2,
-        COOP_ANIMATION_CONFIG.FRAME_WIDTH,
-        COOP_ANIMATION_CONFIG.FRAME_HEIGHT
-      );
+      ctx.globalAlpha = 1.0;
+      if (this.facing > 0) {
+        // Mirror horizontally for right-facing
+        ctx.translate(this.x + this.radius, this.y - this.radius);
+        ctx.scale(-1, 1);
+        ctx.drawImage(img, 0, 0, this.radius * 2, this.radius * 2);
+      } else {
+        ctx.drawImage(img, this.x - this.radius, this.y - this.radius, this.radius * 2, this.radius * 2);
+      }
       ctx.restore();
     } else {
-      // Fallback: simple circle body
+      // fallback: circle
       ctx.save();
-      ctx.translate(this.x, this.y);
       ctx.beginPath();
-      ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+      ctx.arc(this.x, this.y, this.radius, 0, 2 * Math.PI);
       ctx.fillStyle = this.color;
-      ctx.shadowColor = "#fff";
-      ctx.shadowBlur = 12;
-      ctx.globalAlpha = 0.9;
+      ctx.globalAlpha = 0.97;
+      ctx.shadowColor = '#0cf9';
+      ctx.shadowBlur = 18;
       ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.shadowBlur = 0;
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#fff';
+      ctx.stroke();
       ctx.restore();
     }
 
-    // Attack arc indicator (debug or effect)
-    if (this.isAttacking) {
-      ctx.save();
-      ctx.globalAlpha = 0.25;
-      ctx.translate(this.x, this.y);
-      ctx.rotate(this.facing === 1 ? 0 : Math.PI);
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.arc(
-        0, 0,
-        this.attackRadius,
-        -this.attackArc / 2,
-        this.attackArc / 2
-      );
-      ctx.closePath();
-      ctx.fillStyle = "#ff0";
-      ctx.fill();
-      ctx.restore();
-    }
-
-    // HP Bar
+    // Draw HP bar
     ctx.save();
-    let barW = 56, barH = 7;
-    let hpPct = this.stats.hp / this.stats.maxHp;
-    ctx.globalAlpha = 0.8;
+    ctx.globalAlpha = 0.72;
     ctx.fillStyle = "#222";
-    ctx.fillRect(this.x - barW / 2, this.y - this.radius - 22, barW, barH);
+    ctx.fillRect(this.x - this.radius, this.y - this.radius - 20, this.radius * 2, 9);
     ctx.fillStyle = "#0ff";
-    ctx.fillRect(this.x - barW / 2 + 1, this.y - this.radius - 21, (barW - 2) * hpPct, barH - 2);
-    ctx.strokeStyle = "#fff";
-    ctx.strokeRect(this.x - barW / 2, this.y - this.radius - 22, barW, barH);
+    ctx.fillRect(this.x - this.radius, this.y - this.radius - 20, (this.radius * 2) * (this.stats.hp / this.stats.maxHp), 9);
     ctx.restore();
 
-    ctx.restore();
+    // Draw projectiles
+    for (let p of this.projectiles) {
+      ctx.save();
+      ctx.globalAlpha = 0.75;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.radius, 0, 2 * Math.PI);
+      ctx.fillStyle = "#7cf9ff";
+      ctx.shadowColor = "#bff";
+      ctx.shadowBlur = 12;
+      ctx.fill();
+      ctx.restore();
+    }
   }
 };
 
-// =================== PowerUp Entity ===================
-// ... (no changes required here, omitted for brevity) ...
+// ========== ENEMY CLASS ==========
 
-// =================== Enemy Class ===================
-// ... (no changes required here) ...
+// --- New enemy movement/divebomb logic below ---
 
-// =================== EnemyManager (spawn & update enemies per wave) ===================
+window.Enemy = class Enemy {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.baseY = y;
+    this.size = window.GAME_CONSTANTS.ENEMY.SIZE;
+    this.hp = window.GAME_CONSTANTS.ENEMY.HP;
+    this.maxHp = window.GAME_CONSTANTS.ENEMY.HP;
+    this.speed = window.GAME_CONSTANTS.ENEMY.SPEED;
+    this.isAlive = true;
+    this._scored = false;
 
-// --- BEGIN FIX: Ensure EnemyManager is attached to window and is a constructor ---
+    // Animation
+    this.animFrame = 0;
+    this.animTimer = 0;
+    this.animSpeed = 90; // ms per frame
+
+    // PAUSE/SHOCK state
+    this.pauseTimer = 0; // ms
+    this.shakePower = 0; // pixels
+    this._shakePhase = Math.random() * Math.PI * 2;
+
+    // Flight AI
+    this._oscPhase = Math.random() * Math.PI * 2; // randomize flight phase
+    this._oscSpeed = 0.7 + Math.random() * 0.5; // unique up/down speed
+    this._oscAmp = 36 + Math.random() * 22; // unique amplitude
+    this._moveDir = Math.random() < 0.5 ? -1 : 1;
+    this._moveSpeed = 1.2 + Math.random() * 0.6; // slightly different base speed
+
+    // Divebombing
+    this._diveCooldown = 1400 + Math.random() * 1800; // ms until possible next dive
+    this._diveTimer = 0;
+    this._diving = false;
+    this._diveVelY = 0;
+    this._diveTargetX = null;
+    this._diveTargetY = null;
+    this._divePhase = 0;
+    this._returning = false;
+  }
+
+  update(player, dt) {
+    if (!this.isAlive) return;
+
+    // Handle pause/shake
+    if (this.pauseTimer > 0) {
+      this.pauseTimer -= dt;
+      if (this.pauseTimer < 0) this.pauseTimer = 0;
+      // No movement or animation during pause
+      return;
+    }
+
+    // Animation timing
+    this.animTimer += dt;
+    if (this.animTimer > this.animSpeed) {
+      this.animTimer = 0;
+      this.animFrame = (this.animFrame + 1) % window.EnemyAnimationImages.length;
+    }
+
+    // --- Flight pattern: sinusoidal up/down, slow horizontal movement ---
+    if (!this._diving && !this._returning) {
+      // Up/down oscillation
+      this._oscPhase += this._oscSpeed * dt * 0.001;
+      this.y = this.baseY + Math.sin(this._oscPhase) * this._oscAmp;
+
+      // Move horizontally across screen
+      this.x += this._moveDir * this._moveSpeed;
+      // If near edges, bounce back
+      if (this.x < this.size + 20) {
+        this.x = this.size + 20;
+        this._moveDir = 1;
+      } else if (this.x > window.GAME_CONSTANTS.WIDTH - this.size - 20) {
+        this.x = window.GAME_CONSTANTS.WIDTH - this.size - 20;
+        this._moveDir = -1;
+      }
+
+      // --- Divebomb logic ---
+      this._diveTimer += dt;
+      if (this._diveTimer > this._diveCooldown) {
+        // 35% chance per allowed interval to divebomb
+        if (Math.random() < 0.35) {
+          this._diving = true;
+          this._diveTargetX = player.x;
+          this._diveTargetY = player.y - 8;
+          // Store start for return
+          this._diveStartX = this.x;
+          this._diveStartY = this.y;
+          this._divePhase = 0;
+          this._diveDuration = 500 + Math.random() * 200; // ms for dive
+        }
+        this._diveCooldown = 1400 + Math.random() * 1800;
+        this._diveTimer = 0;
+      }
+    }
+
+    // --- Divebombing phase ---
+    if (this._diving) {
+      // Interpolate toward player using ease
+      this._divePhase += dt;
+      const t = Math.min(this._divePhase / this._diveDuration, 1);
+      // Quadratic ease-in for fast dive
+      const easeT = t * t;
+      // Dive straight to target
+      this.x = this._diveStartX + (this._diveTargetX - this._diveStartX) * easeT;
+      this.y = this._diveStartY + (this._diveTargetY - this._diveStartY) * easeT;
+
+      if (t >= 1) {
+        this._diving = false;
+        this._returning = true;
+        this._returnPhase = 0;
+        this._returnDuration = 600 + Math.random() * 220;
+        this._returnStartX = this.x;
+        this._returnStartY = this.y;
+      }
+    } else if (this._returning) {
+      // Return to original flight path (baseY and current x)
+      this._returnPhase += dt;
+      const t = Math.min(this._returnPhase / this._returnDuration, 1);
+      // Smooth ease-out
+      const easeT = 1 - (1 - t) * (1 - t);
+      this.x = this._returnStartX + (this._diveStartX - this._returnStartX) * easeT;
+      this.y = this._returnStartY + (this.baseY + Math.sin(this._oscPhase) * this._oscAmp - this._returnStartY) * easeT;
+      if (t >= 1) {
+        this._returning = false;
+        // Snap to path
+        this.x = this._diveStartX;
+        this.y = this.baseY + Math.sin(this._oscPhase) * this._oscAmp;
+      }
+    }
+  }
+
+  takeDamage(amount, opts = {}) {
+    this.hp -= amount;
+    if (this.hp <= 0) {
+      this.isAlive = false;
+    }
+    // Pause and shake effect only if alive after hit (or on death as well - up to you)
+    if (this.isAlive) {
+      this.pauseTimer = 180; // ms
+      this.shakePower = 8; // pixels
+      this._shakePhase = Math.random() * Math.PI * 2;
+    }
+  }
+
+  draw(ctx) {
+    if (!this.isAlive) return;
+
+    // Shake offset
+    let shakeX = 0, shakeY = 0;
+    if (this.pauseTimer > 0 && this.shakePower > 0) {
+      // Shake with decaying amplitude
+      const t = this.pauseTimer / 180;
+      const amp = this.shakePower * t;
+      shakeX = Math.sin(performance.now() * 0.04 + this._shakePhase) * amp;
+      shakeY = Math.cos(performance.now() * 0.055 + this._shakePhase) * amp * 0.65;
+    }
+
+    // Draw animated sprite with transparent background
+    const img = window.EnemyAnimationImages[this.animFrame];
+    if (img && img.complete && img.naturalWidth && img.naturalHeight) {
+      ctx.save();
+      ctx.globalAlpha = 1.0;
+      ctx.drawImage(
+        img,
+        this.x - this.size + shakeX,
+        this.y - this.size + shakeY,
+        this.size * 2,
+        this.size * 2
+      );
+      ctx.restore();
+    } else {
+      // fallback: circle
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(this.x + shakeX, this.y + shakeY, this.size, 0, 2 * Math.PI);
+      ctx.fillStyle = '#fa4646';
+      ctx.globalAlpha = 0.7;
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // Optional: Draw HP bar above enemy
+    if (this.isAlive && this.hp < this.maxHp) {
+      ctx.save();
+      const barWidth = this.size * 2;
+      const barHeight = 6;
+      ctx.globalAlpha = 0.7;
+      ctx.fillStyle = "#222";
+      ctx.fillRect(this.x - this.size + shakeX, this.y - this.size - 16 + shakeY, barWidth, barHeight);
+      ctx.fillStyle = "#f44";
+      ctx.fillRect(this.x - this.size + shakeX, this.y - this.size - 16 + shakeY, barWidth * (this.hp / this.maxHp), barHeight);
+      ctx.restore();
+    }
+  }
+};
+
+// ========== ENEMY MANAGER ==========
 
 window.EnemyManager = class EnemyManager {
   constructor() {
     this.enemies = [];
-    this.onWaveEnd = null; // Callback when wave is cleared
-    this._waveActive = false;
-    this._waveTimer = 0;
+    this.onWaveEnd = null;
   }
 
-  /**
-   * Spawn a new wave of enemies.
-   * @param {number} count - How many enemies to spawn.
-   * @param {object} opts - Options (unused for now).
-   */
   startWave(count, opts) {
     this.enemies = [];
+    // Spread enemies horizontally across right side, but in the air
     for (let i = 0; i < count; ++i) {
-      // Place enemies somewhat spread out horizontally
-      let x = 580 + i * 56 + Math.random() * 30;
-      let y = window.GAME_CONSTANTS.GROUND_Y - 16;
+      const x = 700 + Math.random() * 180;
+      const y = window.GAME_CONSTANTS.GROUND_Y - 82 - Math.random() * 88;
       this.enemies.push(new window.Enemy(x, y));
     }
-    this._waveActive = true;
-    this._waveTimer = 0;
   }
 
-  /**
-   * Update all enemies, handle wave completion.
-   * @param {Player} player
-   * @param {number} dt
-   */
   update(player, dt) {
-    let alive = 0;
     for (let e of this.enemies) {
-      if (e.isAlive) {
-        e.update(player, dt);
-        alive++;
-      }
+      e.update(player, dt);
     }
-    // Check if wave cleared
-    if (this._waveActive && alive === 0) {
-      this._waveActive = false;
-      // Give a slight delay before calling onWaveEnd (for visuals)
-      if (typeof this.onWaveEnd === "function") {
-        setTimeout(() => this.onWaveEnd(), 450);
-      }
+    // Remove defeated enemies after short delay
+    this.enemies = this.enemies.filter(e => e.isAlive || !e._scored);
+
+    // Check for end of wave
+    if (typeof this.onWaveEnd === "function" && this.enemies.every(e => !e.isAlive)) {
+      this.onWaveEnd();
     }
   }
 
-  /**
-   * Draw all enemies.
-   * @param {CanvasRenderingContext2D} ctx
-   */
   draw(ctx) {
     for (let e of this.enemies) {
       e.draw(ctx);
     }
   }
 };
-
-// --- END FIX ---
-
-// --- Ensure window.Enemy exists for EnemyManager (for completeness in this snippet) ---
-if (typeof window.Enemy !== "function") {
-  window.Enemy = class Enemy {
-    constructor(x, y) {
-      const C = window.GAME_CONSTANTS.ENEMY;
-      this.x = x;
-      this.y = y;
-      this.size = C.SIZE;
-      this.color = C.COLOR;
-      this.hp = C.HP;
-      this.isAlive = true;
-      this._vx = window.Utils.randBetween(-2, -0.6);
-      this._vy = 0;
-      this.attackCooldown = C.ATTACK_COOLDOWN;
-      this._attackTimer = 0;
-      this._scored = false;
-    }
-    update(player, dt) {
-      if (!this.isAlive) return;
-      // Basic AI: Move towards the player and jump randomly
-      let dx = player.x - this.x;
-      let dist = Math.abs(dx);
-      if (dist > 8) {
-        this.x += Math.sign(dx) * window.GAME_CONSTANTS.ENEMY.SPEED;
-      }
-      // Simulate gravity
-      this._vy += window.GAME_CONSTANTS.GRAVITY * 0.6;
-      this.y += this._vy;
-      // Ground collision
-      if (this.y + this.size / 2 > window.GAME_CONSTANTS.GROUND_Y + 20) {
-        this.y = window.GAME_CONSTANTS.GROUND_Y + 20 - this.size / 2;
-        this._vy = 0;
-      }
-      // Attack
-      this._attackTimer -= dt;
-      if (this._attackTimer <= 0 && dist < 60) {
-        this._attackTimer = this.attackCooldown;
-        player.stats.hp -= 10;
-      }
-      // Die if hp falls below zero
-      if (this.hp <= 0) {
-        this.isAlive = false;
-      }
-    }
-    takeDamage(dmg) {
-      this.hp -= dmg;
-      if (this.hp <= 0) {
-        this.isAlive = false;
-      }
-    }
-    draw(ctx) {
-      if (!this.isAlive) return;
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, this.size / 2, 0, Math.PI * 2);
-      ctx.fillStyle = this.color;
-      ctx.shadowColor = "#fa4";
-      ctx.shadowBlur = 12;
-      ctx.globalAlpha = 0.97;
-      ctx.fill();
-      ctx.restore();
-      // HP bar
-      ctx.save();
-      let barW = 36, barH = 5;
-      let hpPct = Math.max(0, this.hp / window.GAME_CONSTANTS.ENEMY.HP);
-      ctx.globalAlpha = 0.75;
-      ctx.fillStyle = "#222";
-      ctx.fillRect(this.x - barW / 2, this.y - this.size / 2 - 10, barW, barH);
-      ctx.fillStyle = "#fa4";
-      ctx.fillRect(this.x - barW / 2 + 1, this.y - this.size / 2 - 9, (barW - 2) * hpPct, barH - 2);
-      ctx.strokeStyle = "#fff";
-      ctx.strokeRect(this.x - barW / 2, this.y - this.size / 2 - 10, barW, barH);
-      ctx.restore();
-    }
-  };
-}
