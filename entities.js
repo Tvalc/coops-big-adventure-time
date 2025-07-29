@@ -5,6 +5,7 @@ const COOP_ANIMATION_CONFIG = {
   WALK_FRAME_COUNT: 5,
   WALK_FRAME_DURATION: 140, // ms per frame: SNES pacing ~0.12-0.16s
   IMAGE_URLS: [
+    // RESTORED: Original Coop walk cycle image URLs (left-facing, SNES-style, 32x48 PNG)
     "https://dcnmwoxzefwqmvvkpqap.supabase.co/storage/v1/object/public/sprite-studio-exports/0f84fe06-5c42-40c3-b563-1a28d18f37cc/library/Coop_walk_left_1_1753755399811.png",
     "https://dcnmwoxzefwqmvvkpqap.supabase.co/storage/v1/object/public/sprite-studio-exports/0f84fe06-5c42-40c3-b563-1a28d18f37cc/library/Coop_walk_left_2_1753755415493.png",
     "https://dcnmwoxzefwqmvvkpqap.supabase.co/storage/v1/object/public/sprite-studio-exports/0f84fe06-5c42-40c3-b563-1a28d18f37cc/library/Coop_walk_left_3_1753755438859.png",
@@ -33,333 +34,366 @@ function preloadImages(urls, cb) {
 }
 
 // =================== BubbleProjectile Class ===================
-// ... (no changes required here, omitted for brevity) ...
+window.BubbleProjectile = class BubbleProjectile {
+  /**
+   * @param {number} x - Initial X position.
+   * @param {number} y - Initial Y position.
+   * @param {number} dir - Direction: 1 for right, -1 for left.
+   */
+  constructor(x, y, dir) {
+    this.x = x;
+    this.y = y;
+    this.radius = 14;
+    this.speed = 8 * dir; // dir: 1 (right), -1 (left)
+    this.vx = this.speed;
+    this.vy = 0;
+    this.lifetime = 1200; // ms
+    this.isDestroyed = false;
+    this.damage = 8; // Match design doc: bubble gun base damage
+  }
+
+  /**
+   * Update projectile position and collision.
+   * @param {Array} enemies - Array of enemy objects.
+   * @param {number} dt - Delta time (ms).
+   */
+  update(enemies, dt) {
+    if (this.isDestroyed) return;
+    this.x += this.vx;
+    this.y += this.vy;
+    this.lifetime -= dt;
+    // Destroy if off-screen
+    if (
+      this.x < -this.radius ||
+      this.x > window.GAME_CONSTANTS.WIDTH + this.radius ||
+      this.lifetime <= 0
+    ) {
+      this.isDestroyed = true;
+      return;
+    }
+    // Collision with enemies
+    for (let e of enemies) {
+      if (e.isAlive) {
+        const dx = e.x - this.x, dy = e.y - this.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < this.radius + e.size / 2) {
+          if (typeof e.takeDamage === "function") {
+            e.takeDamage(this.damage);
+          }
+          this.isDestroyed = true;
+          break;
+        }
+      }
+    }
+  }
+
+  /**
+   * Render the projectile.
+   * @param {CanvasRenderingContext2D} ctx
+   */
+  draw(ctx) {
+    if (this.isDestroyed) return;
+    ctx.save();
+    // Bubble: blue with white highlight
+    ctx.globalAlpha = 0.85;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+    let grad = ctx.createRadialGradient(
+      this.x, this.y, this.radius * 0.3,
+      this.x, this.y, this.radius
+    );
+    grad.addColorStop(0, "#fff");
+    grad.addColorStop(0.4, "#bbf7ff");
+    grad.addColorStop(1, "#3ec6ff");
+    ctx.fillStyle = grad;
+    ctx.shadowColor = "#0ff";
+    ctx.shadowBlur = 12;
+    ctx.fill();
+    // Highlight
+    ctx.globalAlpha = 0.25;
+    ctx.beginPath();
+    ctx.arc(this.x - this.radius / 3, this.y - this.radius / 3, this.radius / 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = "#fff";
+    ctx.fill();
+    ctx.restore();
+  }
+};
 
 // =================== Player Class ===================
 window.Player = class Player {
+  /**
+   * Creates the player character.
+   * @param {number} x - Initial X position.
+   * @param {number} y - Initial Y position.
+   */
   constructor(x, y) {
-    const conf = window.GAME_CONSTANTS.PLAYER;
+    const C = window.GAME_CONSTANTS.PLAYER;
     this.x = x;
     this.y = y;
-    // Double the radius for collision logic as we are doubling sprite size
-    this.radius = conf.RADIUS * 2;
-    this.color = conf.COLOR;
-    this.isGrounded = false;
-    this.attackCooldown = 0;
-    this.facing = 1; // 1: right, -1: left
-    /** @type {PlayerStats} */
-    this.stats = {
-      hp: conf.HP, maxHp: conf.HP,
-      attack: 14, defense: 4,
-      speed: conf.MOVE_SPEED, jump: conf.JUMP_VELOCITY,
-      currency: 0, score: 0
-    };
-    // Power-up system
-    this.activePowerUps = [];
-    this.powerUpTimers = {};
-    // Animation setup
-    this._initAnimationSystem();
-
-    // --- Bubble Gun Mechanic ---
-    /** @type {Array<BubbleProjectile>} */
+    this.vx = 0;
+    this.vy = 0;
+    this.radius = 36; // Rendered radius, slightly larger than base for hitbox
+    this.grounded = false;
+    this.facing = 1; // 1 = right, -1 = left
+    this.isAttacking = false;
+    this.attackTimer = 0;
+    this.attackArc = C.ATTACK_ARC;
+    this.attackRadius = C.ATTACK_RADIUS * 2;
+    this.attackCooldown = C.ATTACK_COOLDOWN;
+    this.shootCooldown = C.SHOOT_COOLDOWN;
+    this.shootTimer = 0;
+    this.moveSpeed = C.MOVE_SPEED;
+    this.jumpVelocity = C.JUMP_VELOCITY;
+    this.color = C.COLOR;
     this.projectiles = [];
-    /** @type {number} */
-    this.shootCooldown = 0;
-  }
+    this._walkAnimT = 0;
+    this._walkFrame = 0;
+    this._walkImages = [];
+    this._walkImagesLoaded = false;
 
-  _initAnimationSystem() {
-    // Future extensible: can add more actions, directions etc.
-    this.animations = {
-      idle: { frames: [], duration: 400, loop: true },
-      walk_left: { frames: [], duration: COOP_ANIMATION_CONFIG.WALK_FRAME_DURATION, loop: true },
-      walk_right: { frames: [], duration: COOP_ANIMATION_CONFIG.WALK_FRAME_DURATION, loop: true }
-      // e.g. jump, attack: to add later
+    // Player stats
+    this.stats = {
+      hp: C.HP,
+      maxHp: C.HP,
+      attack: 12,
+      bubbleDmg: 8,
+      score: 0,
+      currency: 0
     };
-    this.animState = "idle";
-    this.animTime = 0; // ms
-    this.animFrameIdx = 0;
 
-    // Preload images
-    this._coopImages = preloadImages(COOP_ANIMATION_CONFIG.IMAGE_URLS, (imgs) => {
-      // On load, assign frames for walk_left/right, idle
-      this.animations.walk_left.frames = imgs;
-      this.animations.idle.frames = [imgs[0]];
-      this.animations.walk_right.frames = imgs; // We'll mirror at draw time
-      // Optionally, can trigger re-render if needed
+    // Preload walk cycle images (left-facing, flip for right)
+    this._walkImages = preloadImages(COOP_ANIMATION_CONFIG.IMAGE_URLS, (imgs) => {
+      this._walkImagesLoaded = true;
     });
   }
 
-  move(dir) {
-    this.vx = dir * this.stats.speed;
-    if (dir !== 0) this.facing = dir;
+  /**
+   * Resets the player state for a fresh game start or respawn.
+   * (Call on restart if needed)
+   */
+  reset(x, y) {
+    const C = window.GAME_CONSTANTS.PLAYER;
+    this.x = x || 120;
+    this.y = y || (window.GAME_CONSTANTS.GROUND_Y - window.GAME_CONSTANTS.PLAYER.RADIUS);
+    this.vx = 0;
+    this.vy = 0;
+    this.grounded = false;
+    this.facing = 1;
+    this.isAttacking = false;
+    this.attackTimer = 0;
+    this.shootTimer = 0;
+    this.projectiles = [];
+    this._walkAnimT = 0;
+    this._walkFrame = 0;
+    this.stats = {
+      hp: C.HP,
+      maxHp: C.HP,
+      attack: 12,
+      bubbleDmg: 8,
+      score: 0,
+      currency: 0
+    };
+    // Walk images do not need reload, will be reused if loaded
   }
 
-  jump() {
-    if (this.isGrounded) {
-      this.vy = -this.stats.jump;
-      this.isGrounded = false;
+  /**
+   * Update player position, state, and projectiles.
+   * @param {InputSystem} input
+   * @param {number} dt
+   * @param {Object} world - {enemies}
+   */
+  update(input, dt, world) {
+    // Movement input
+    let left = input.isDown("left"), right = input.isDown("right");
+    let moving = false;
+    if (left && !right) {
+      this.vx = -this.moveSpeed;
+      this.facing = -1;
+      moving = true;
+    } else if (right && !left) {
+      this.vx = this.moveSpeed;
+      this.facing = 1;
+      moving = true;
+    } else {
+      this.vx = 0;
+    }
+
+    // Horizontal movement
+    this.x += this.vx;
+
+    // Gravity
+    this.vy += window.GAME_CONSTANTS.GRAVITY;
+    this.y += this.vy;
+
+    // Floor collision
+    if (this.y + this.radius > window.GAME_CONSTANTS.GROUND_Y + 24) {
+      this.y = window.GAME_CONSTANTS.GROUND_Y + 24 - this.radius;
+      this.vy = 0;
+      this.grounded = true;
+    } else {
+      this.grounded = false;
+    }
+
+    // Clamp to world bounds
+    this.x = Math.max(this.radius, Math.min(window.GAME_CONSTANTS.WIDTH - this.radius, this.x));
+    this.y = Math.min(window.GAME_CONSTANTS.GROUND_Y + 24 - this.radius, this.y);
+
+    // Attack cooldown
+    if (this.attackTimer > 0) this.attackTimer -= dt;
+    if (this.shootTimer > 0) this.shootTimer -= dt;
+
+    // Update projectiles
+    for (let p of this.projectiles) {
+      p.update(world.enemies, dt);
+    }
+    // Remove destroyed
+    this.projectiles = this.projectiles.filter(p => !p.isDestroyed);
+
+    // Walk animation
+    if (moving) {
+      this._walkAnimT += dt;
+      if (this._walkAnimT > COOP_ANIMATION_CONFIG.WALK_FRAME_DURATION) {
+        this._walkFrame = (this._walkFrame + 1) % COOP_ANIMATION_CONFIG.WALK_FRAME_COUNT;
+        this._walkAnimT = 0;
+      }
+    } else {
+      this._walkFrame = 0;
+      this._walkAnimT = 0;
     }
   }
 
+  /**
+   * Player jump action.
+   */
+  jump() {
+    if (this.grounded) {
+      this.vy = -this.jumpVelocity;
+      this.grounded = false;
+    }
+  }
+
+  /**
+   * Player attack action - melee swing.
+   * @param {Array} enemies
+   * @returns {boolean} True if any enemy was hit
+   */
   attack(enemies) {
-    if (this.attackCooldown > 0) return;
-    // Simple attack: damage all enemies in attack arc
+    if (this.attackTimer > 0) return false;
+    this.attackTimer = this.attackCooldown;
     let hit = false;
+    // Attack arc: from facing direction, in front of the player
+    let px = this.x + this.facing * this.radius * 0.7;
+    let py = this.y;
+    let arcCenter = Math.atan2(0, this.facing); // 0 or PI
+
     for (let e of enemies) {
-      const dx = e.x - this.x, dy = e.y - this.y;
-      const dist = Math.sqrt(dx*dx + dy*dy);
-      const angle = Math.atan2(dy, dx);
-      // Facing angle unused, but in the future can be used for attack arc
-      if (
-        dist <= window.GAME_CONSTANTS.PLAYER.ATTACK_RADIUS * 2 + e.size/2 &&
-        Math.abs(window.Utils.lerp(-Math.PI/2, Math.PI/2, (this.facing+1)/2) - angle) < window.GAME_CONSTANTS.PLAYER.ATTACK_ARC/2
-      ) {
-        e.takeDamage(this.stats.attack);
-        hit = true;
+      if (!e.isAlive) continue;
+      let dx = e.x - px, dy = e.y - py;
+      let dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < this.attackRadius + e.size / 2) {
+        // Arc check
+        let ang = Math.atan2(dy, dx);
+        let diff = Math.abs(window.Utils.angleDiff(arcCenter, ang));
+        if (diff < this.attackArc / 2) {
+          if (typeof e.takeDamage === "function") {
+            e.takeDamage(this.stats.attack);
+            hit = true;
+          }
+        }
       }
     }
-    this.attackCooldown = window.GAME_CONSTANTS.PLAYER.ATTACK_COOLDOWN;
+    this.isAttacking = true;
+    setTimeout(() => { this.isAttacking = false; }, 180);
     return hit;
   }
 
   /**
-   * Player's ranged bubble gun attack (shoot). Spawns a BubbleProjectile if not on cooldown.
+   * Player shoot action - fires a bubble projectile.
    */
   shoot() {
-    if (this.shootCooldown > 0) return false;
-    // Bubble spawns from near player's front
-    const spawnX = this.x + this.facing * (this.radius + 8);
-    const spawnY = this.y - 10;
-    const projectile = new window.BubbleProjectile(spawnX, spawnY, this.facing);
-    this.projectiles.push(projectile);
-    this.shootCooldown = window.GAME_CONSTANTS.PLAYER.SHOOT_COOLDOWN;
+    if (this.shootTimer > 0) return false;
+    this.shootTimer = this.shootCooldown;
+    // Bubble appears slightly in front of player
+    let px = this.x + this.facing * (this.radius - 10);
+    let py = this.y - 10;
+    let proj = new window.BubbleProjectile(px, py, this.facing);
+    this.projectiles.push(proj);
     return true;
   }
 
-  takeDamage(dmg) {
-    if (this.hasPowerUp('invincible')) return;
-    this.stats.hp -= dmg;
-    if (this.stats.hp < 0) this.stats.hp = 0;
-  }
-
-  hasPowerUp(type) {
-    return this.activePowerUps.includes(type);
-  }
-
-  addPowerUp(type, duration) {
-    if (!this.activePowerUps.includes(type)) {
-      this.activePowerUps.push(type);
-    }
-    this.powerUpTimers[type] = duration;
-    if (type === "heal") {
-      let healAmount = Math.floor(this.stats.maxHp * 0.35);
-      this.stats.hp = Math.min(this.stats.maxHp, this.stats.hp + healAmount);
-      this.removePowerUp("heal");
-    }
-  }
-
-  removePowerUp(type) {
-    let idx = this.activePowerUps.indexOf(type);
-    if (idx !== -1) this.activePowerUps.splice(idx, 1);
-    delete this.powerUpTimers[type];
-    if (type === "attackUp") this.stats.attack -= 8;
-    if (type === "speedUp") this.stats.speed -= 2.5;
-  }
-
-  applyPowerUps(dt) {
-    for (let type of [...this.activePowerUps]) {
-      if (type === "attackUp" && !this.stats._attackBoosted) {
-        this.stats.attack += 8;
-        this.stats._attackBoosted = true;
-      }
-      if (type === "speedUp" && !this.stats._speedBoosted) {
-        this.stats.speed += 2.5;
-        this.stats._speedBoosted = true;
-      }
-      if (this.powerUpTimers[type] != null) {
-        this.powerUpTimers[type] -= dt;
-        if (this.powerUpTimers[type] <= 0) {
-          this.removePowerUp(type);
-          if (type === "attackUp") delete this.stats._attackBoosted;
-          if (type === "speedUp") delete this.stats._speedBoosted;
-        }
-      }
-    }
-  }
-
   /**
-   * Update player physics, powerups, and projectiles.
-   * @param {InputSystem} input
-   * @param {number} dt
-   * @param {Object} world
-   */
-  update(input, dt, world) {
-    this.applyPowerUps(dt);
-
-    // Horizontal movement
-    if (input.left) this.move(-1);
-    else if (input.right) this.move(1);
-    else this.move(0);
-
-    // Animation state selection (future extensible)
-    if (input.left) this._setAnimState("walk_left");
-    else if (input.right) this._setAnimState("walk_right");
-    else this._setAnimState("idle");
-
-    // Animation update
-    this._updateAnimation(dt);
-
-    // Physics
-    this.x += this.vx;
-    this.vy += window.GAME_CONSTANTS.GRAVITY;
-    this.y += this.vy;
-
-    // Ground collision using spriteFeetOffset for accurate sprite feet alignment
-    const spriteFeetOffset = 4 * 2; // double the feet offset for double size!
-    if (this.y + spriteFeetOffset >= window.GAME_CONSTANTS.GROUND_Y) {
-      this.y = window.GAME_CONSTANTS.GROUND_Y - spriteFeetOffset;
-      this.vy = 0;
-      this.isGrounded = true;
-    } else {
-      this.isGrounded = false;
-    }
-    this.x = window.Utils.clamp(this.x, this.radius, window.GAME_CONSTANTS.WIDTH - this.radius);
-
-    // Attack timer
-    if (this.attackCooldown > 0) this.attackCooldown -= dt;
-    if (this.attackCooldown < 0) this.attackCooldown = 0;
-
-    // --- Bubble Gun projectile update ---
-    // Update all active projectiles and remove destroyed/off-screen
-    if (this.projectiles && Array.isArray(this.projectiles)) {
-      for (let i = this.projectiles.length - 1; i >= 0; --i) {
-        let proj = this.projectiles[i];
-        proj.update(world && world.enemies ? world.enemies : [], dt);
-        if (proj.isDestroyed) this.projectiles.splice(i, 1);
-      }
-    }
-    // Shoot cooldown
-    if (this.shootCooldown > 0) this.shootCooldown -= dt;
-    if (this.shootCooldown < 0) this.shootCooldown = 0;
-  }
-
-  _setAnimState(state) {
-    if (this.animState !== state) {
-      this.animState = state;
-      this.animTime = 0;
-      this.animFrameIdx = 0;
-    }
-  }
-
-  _updateAnimation(dt) {
-    const anim = this.animations[this.animState];
-    if (!anim || anim.frames.length === 0) return;
-    this.animTime += dt;
-    const totalFrames = anim.frames.length;
-    const frameDuration = anim.duration;
-    if (anim.loop) {
-      this.animFrameIdx = Math.floor(this.animTime / frameDuration) % totalFrames;
-    } else {
-      if (this.animTime / frameDuration >= totalFrames) {
-        this.animFrameIdx = totalFrames - 1;
-      } else {
-        this.animFrameIdx = Math.floor(this.animTime / frameDuration);
-      }
-    }
-  }
-
-  /**
-   * Draws the player and all active projectiles.
+   * Render the player and projectiles.
    * @param {CanvasRenderingContext2D} ctx
    */
   draw(ctx) {
-    // If Coop sprites loaded, use them. Otherwise fallback to orb.
-    let spriteDrawn = false;
-    const anim = this.animations[this.animState];
-    if (anim && anim.frames.length > 0) {
-      const img = anim.frames[this.animFrameIdx % anim.frames.length];
-      if (img && img.complete) {
-        ctx.save();
-        // Placement: center bottom at (this.x, this.y+4*2)
-        const w = COOP_ANIMATION_CONFIG.FRAME_WIDTH;
-        const h = COOP_ANIMATION_CONFIG.FRAME_HEIGHT;
-        const cx = this.x;
-        const cy = this.y + 4 * 2; // double size means double feet offset
-        ctx.translate(cx, cy);
-        // Double the scale
-        ctx.scale(2, 2);
-        // Flip horizontally for walk_right
-        if (
-          (this.animState === "walk_right" || (this.animState === "idle" && this.facing === 1))
-        ) {
-          ctx.scale(-1, 1);
-        }
-        ctx.drawImage(img, -w / 2, -h, w, h);
-        ctx.restore();
-        spriteDrawn = true;
-      }
+    // Draw projectiles
+    for (let p of this.projectiles) {
+      p.draw(ctx);
     }
-    if (!spriteDrawn) {
-      // Fallback to orb (legacy) - double size
+
+    ctx.save();
+
+    // Sprite animation if loaded
+    if (this._walkImagesLoaded && this._walkImages[this._walkFrame]) {
       ctx.save();
+      ctx.translate(this.x, this.y - 8);
+      ctx.scale(-this.facing, 1); // <-- CHANGED: flip horizontally when facing right
+      ctx.drawImage(
+        this._walkImages[this._walkFrame],
+        -COOP_ANIMATION_CONFIG.FRAME_WIDTH / 2,
+        -COOP_ANIMATION_CONFIG.FRAME_HEIGHT / 2,
+        COOP_ANIMATION_CONFIG.FRAME_WIDTH,
+        COOP_ANIMATION_CONFIG.FRAME_HEIGHT
+      );
+      ctx.restore();
+    } else {
+      // Fallback: simple circle body
+      ctx.save();
+      ctx.translate(this.x, this.y);
       ctx.beginPath();
-      ctx.arc(this.x, this.y, window.GAME_CONSTANTS.PLAYER.RADIUS * 2, 0, Math.PI*2);
-      let grad = ctx.createRadialGradient(this.x, this.y, window.GAME_CONSTANTS.PLAYER.RADIUS*1.2, this.x, this.y, window.GAME_CONSTANTS.PLAYER.RADIUS*2);
-      grad.addColorStop(0, '#bbf7ff');
-      grad.addColorStop(0.5, this.color);
-      grad.addColorStop(1, '#1861a0');
-      ctx.fillStyle = grad;
-      ctx.shadowColor = '#0ff';
-      ctx.shadowBlur = 24;
+      ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+      ctx.fillStyle = this.color;
+      ctx.shadowColor = "#fff";
+      ctx.shadowBlur = 12;
+      ctx.globalAlpha = 0.9;
       ctx.fill();
-      ctx.restore();
-      ctx.save();
-      ctx.fillStyle = '#fff';
-      ctx.beginPath();
-      ctx.ellipse(this.x+this.facing*20, this.y-16, 14, 22, 0, 0, Math.PI*2);
-      ctx.fill();
-      ctx.restore();
-    }
-    // Powerup visual indicator overlays (unchanged, adjust for new radius)
-    if (this.hasPowerUp('invincible')) {
-      ctx.save();
-      ctx.globalAlpha = 0.4;
-      ctx.strokeStyle = "#ffd700";
-      ctx.lineWidth = 7;
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, this.radius+8, 0, Math.PI*2);
-      ctx.stroke();
-      ctx.restore();
-    }
-    if (this.hasPowerUp('attackUp')) {
-      ctx.save();
-      ctx.globalAlpha = 0.3;
-      ctx.strokeStyle = "#f22";
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, this.radius+15, 0, Math.PI*2);
-      ctx.stroke();
-      ctx.restore();
-    }
-    if (this.hasPowerUp('speedUp')) {
-      ctx.save();
-      ctx.globalAlpha = 0.25;
-      ctx.strokeStyle = "#3ff";
-      ctx.setLineDash([6, 7]);
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, this.radius+22, 0, Math.PI*2);
-      ctx.stroke();
-      ctx.setLineDash([]);
       ctx.restore();
     }
 
-    // --- Draw all active bubble projectiles (bubble gun) ---
-    if (this.projectiles && Array.isArray(this.projectiles)) {
-      for (let proj of this.projectiles) {
-        proj.draw(ctx);
-      }
+    // Attack arc indicator (debug or effect)
+    if (this.isAttacking) {
+      ctx.save();
+      ctx.globalAlpha = 0.25;
+      ctx.translate(this.x, this.y);
+      ctx.rotate(this.facing === 1 ? 0 : Math.PI);
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.arc(
+        0, 0,
+        this.attackRadius,
+        -this.attackArc / 2,
+        this.attackArc / 2
+      );
+      ctx.closePath();
+      ctx.fillStyle = "#ff0";
+      ctx.fill();
+      ctx.restore();
     }
+
+    // HP Bar
+    ctx.save();
+    let barW = 56, barH = 7;
+    let hpPct = this.stats.hp / this.stats.maxHp;
+    ctx.globalAlpha = 0.8;
+    ctx.fillStyle = "#222";
+    ctx.fillRect(this.x - barW / 2, this.y - this.radius - 22, barW, barH);
+    ctx.fillStyle = "#0ff";
+    ctx.fillRect(this.x - barW / 2 + 1, this.y - this.radius - 21, (barW - 2) * hpPct, barH - 2);
+    ctx.strokeStyle = "#fff";
+    ctx.strokeRect(this.x - barW / 2, this.y - this.radius - 22, barW, barH);
+    ctx.restore();
+
+    ctx.restore();
   }
 };
 
@@ -367,85 +401,62 @@ window.Player = class Player {
 // ... (no changes required here, omitted for brevity) ...
 
 // =================== Enemy Class ===================
-// ... (no changes required here, omitted for brevity) ...
-
-// =================== PowerUp Manager ===================
-// ... (no changes required here, omitted for brevity) ...
-
-// =================== Enemy Spawn Manager ===================
-// ... (no changes required here, omitted for brevity) ...
+// ... (no changes required here) ...
 
 // =================== EnemyManager (spawn & update enemies per wave) ===================
+
+// --- BEGIN FIX: Ensure EnemyManager is attached to window and is a constructor ---
+
 window.EnemyManager = class EnemyManager {
   constructor() {
     this.enemies = [];
-    this.onWaveEnd = null;
+    this.onWaveEnd = null; // Callback when wave is cleared
+    this._waveActive = false;
+    this._waveTimer = 0;
   }
 
   /**
-   * Spawns a new wave of enemies.
-   * @param {number} n - number of enemies
-   * @param {Object} [options]
+   * Spawn a new wave of enemies.
+   * @param {number} count - How many enemies to spawn.
+   * @param {object} opts - Options (unused for now).
    */
-  startWave(n, options = {}) {
+  startWave(count, opts) {
     this.enemies = [];
-    // Simple placeholder: enemies line up at right, spaced horizontally
-    for (let i = 0; i < n; ++i) {
-      let x = window.GAME_CONSTANTS.WIDTH - 60 - i * 60;
-      let y = window.GAME_CONSTANTS.GROUND_Y - 32;
-      // If Enemy class not defined, add minimal placeholder
-      if (typeof window.Enemy !== "function") {
-        window.Enemy = class Enemy {
-          constructor(x, y) {
-            this.x = x;
-            this.y = y;
-            this.size = 32;
-            this.isAlive = true;
-            this._scored = false;
-          }
-          update(player, dt) {
-            // Simple AI: move left
-            this.x -= 0.5;
-            if (this.x < 0) this.isAlive = false;
-          }
-          draw(ctx) {
-            ctx.save();
-            ctx.fillStyle = "#f44";
-            ctx.beginPath();
-            ctx.arc(this.x, this.y, this.size / 2, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.restore();
-          }
-          takeDamage(dmg) {
-            this.isAlive = false;
-          }
-        };
-      }
+    for (let i = 0; i < count; ++i) {
+      // Place enemies somewhat spread out horizontally
+      let x = 580 + i * 56 + Math.random() * 30;
+      let y = window.GAME_CONSTANTS.GROUND_Y - 16;
       this.enemies.push(new window.Enemy(x, y));
     }
+    this._waveActive = true;
+    this._waveTimer = 0;
   }
 
   /**
-   * Updates all enemies. If all enemies are defeated, triggers wave end.
+   * Update all enemies, handle wave completion.
    * @param {Player} player
    * @param {number} dt
    */
   update(player, dt) {
-    let allDefeated = true;
+    let alive = 0;
     for (let e of this.enemies) {
       if (e.isAlive) {
         e.update(player, dt);
-        allDefeated = false;
+        alive++;
       }
     }
-    if (allDefeated && typeof this.onWaveEnd === "function") {
-      this.onWaveEnd();
-      this.onWaveEnd = null;
+    // Check if wave cleared
+    if (this._waveActive && alive === 0) {
+      this._waveActive = false;
+      // Give a slight delay before calling onWaveEnd (for visuals)
+      if (typeof this.onWaveEnd === "function") {
+        setTimeout(() => this.onWaveEnd(), 450);
+      }
     }
   }
 
   /**
-   * Draws all enemies to the canvas context.
+   * Draw all enemies.
    * @param {CanvasRenderingContext2D} ctx
    */
   draw(ctx) {
@@ -454,3 +465,82 @@ window.EnemyManager = class EnemyManager {
     }
   }
 };
+
+// --- END FIX ---
+
+// --- Ensure window.Enemy exists for EnemyManager (for completeness in this snippet) ---
+if (typeof window.Enemy !== "function") {
+  window.Enemy = class Enemy {
+    constructor(x, y) {
+      const C = window.GAME_CONSTANTS.ENEMY;
+      this.x = x;
+      this.y = y;
+      this.size = C.SIZE;
+      this.color = C.COLOR;
+      this.hp = C.HP;
+      this.isAlive = true;
+      this._vx = window.Utils.randBetween(-2, -0.6);
+      this._vy = 0;
+      this.attackCooldown = C.ATTACK_COOLDOWN;
+      this._attackTimer = 0;
+      this._scored = false;
+    }
+    update(player, dt) {
+      if (!this.isAlive) return;
+      // Basic AI: Move towards the player and jump randomly
+      let dx = player.x - this.x;
+      let dist = Math.abs(dx);
+      if (dist > 8) {
+        this.x += Math.sign(dx) * window.GAME_CONSTANTS.ENEMY.SPEED;
+      }
+      // Simulate gravity
+      this._vy += window.GAME_CONSTANTS.GRAVITY * 0.6;
+      this.y += this._vy;
+      // Ground collision
+      if (this.y + this.size / 2 > window.GAME_CONSTANTS.GROUND_Y + 20) {
+        this.y = window.GAME_CONSTANTS.GROUND_Y + 20 - this.size / 2;
+        this._vy = 0;
+      }
+      // Attack
+      this._attackTimer -= dt;
+      if (this._attackTimer <= 0 && dist < 60) {
+        this._attackTimer = this.attackCooldown;
+        player.stats.hp -= 10;
+      }
+      // Die if hp falls below zero
+      if (this.hp <= 0) {
+        this.isAlive = false;
+      }
+    }
+    takeDamage(dmg) {
+      this.hp -= dmg;
+      if (this.hp <= 0) {
+        this.isAlive = false;
+      }
+    }
+    draw(ctx) {
+      if (!this.isAlive) return;
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.size / 2, 0, Math.PI * 2);
+      ctx.fillStyle = this.color;
+      ctx.shadowColor = "#fa4";
+      ctx.shadowBlur = 12;
+      ctx.globalAlpha = 0.97;
+      ctx.fill();
+      ctx.restore();
+      // HP bar
+      ctx.save();
+      let barW = 36, barH = 5;
+      let hpPct = Math.max(0, this.hp / window.GAME_CONSTANTS.ENEMY.HP);
+      ctx.globalAlpha = 0.75;
+      ctx.fillStyle = "#222";
+      ctx.fillRect(this.x - barW / 2, this.y - this.size / 2 - 10, barW, barH);
+      ctx.fillStyle = "#fa4";
+      ctx.fillRect(this.x - barW / 2 + 1, this.y - this.size / 2 - 9, (barW - 2) * hpPct, barH - 2);
+      ctx.strokeStyle = "#fff";
+      ctx.strokeRect(this.x - barW / 2, this.y - this.size / 2 - 10, barW, barH);
+      ctx.restore();
+    }
+  };
+}
