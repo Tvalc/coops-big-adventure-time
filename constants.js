@@ -1,5 +1,56 @@
-const GAME_WIDTH = 480;
-const GAME_HEIGHT = 480;
-const PLAYER_RADIUS = 22;
-const ORB_RADIUS = 15;
-const PLAYER_SPEED = 4;
+window.CONSTANTS = {
+    GAME_WIDTH: 900,
+    GAME_HEIGHT: 480,
+    FLOOR_Y: 400,
+    PLAYER: {
+        WIDTH: 44,
+        HEIGHT: 72,
+        SPEED: 4.2,
+        JUMP_VELOCITY: -13,
+        GRAVITY: 0.63,
+        MAX_HEALTH: 100,
+        ATTACK_COOLDOWN: 220,
+        ATTACK_RANGE: 60,
+        COMBO_LENGTH: 3,
+        INVINCIBILITY: 600,
+    },
+    ENEMY: {
+        WIDTH: 40,
+        HEIGHT: 62,
+        SPEED: 2.4,
+        GRAVITY: 0.63,
+        HEALTH: 38,
+        DAMAGE: 12,
+        ATTACK_RANGE: 44,
+        ATTACK_COOLDOWN: 800,
+        COLOR: '#ff4d4d',
+    },
+    MINI_BOSS: {
+        WIDTH: 60,
+        HEIGHT: 110,
+        SPEED: 1.9,
+        HEALTH: 180,
+        DAMAGE: 26,
+        ATTACK_RANGE: 75,
+        ATTACK_COOLDOWN: 600,
+        COLOR: '#be30b7',
+    },
+    WAVE: {
+        ENEMIES_BASE: 3,
+        ENEMY_INCREASE: 1,
+        MINI_BOSS_WAVE: 4,
+        MAX_WAVES: 6,
+    },
+    CAMERA: {
+        EDGE_MARGIN: 300,
+    },
+    SCORE: {
+        ENEMY: 100,
+        MINI_BOSS: 500,
+    },
+    COLORS: {
+        BG1: "#5a73b4",
+        BG2: "#22284a",
+        FLOOR: "#7d6a58",
+    }
+};

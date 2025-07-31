@@ -1,16 +1,17 @@
-function randomColor() {
-    const letters = '0123456789ABCDEF';
-    let color = '#';
-    for (let i = 0; i < 6; i++) {
-        color += letters[Math.floor(Math.random() * 16)];
+window.Utils = {
+    clamp: function(val, min, max) {
+        return Math.max(min, Math.min(max, val));
+    },
+    rectsOverlap: function(ax, ay, aw, ah, bx, by, bw, bh) {
+        return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
+    },
+    lerp: function(a, b, t) {
+        return a + (b - a) * t;
+    },
+    randomInt: function(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    },
+    sign: function(x) {
+        return x < 0 ? -1 : (x > 0 ? 1 : 0);
     }
-    return color;
-}
-
-function randInt(min, max) {
-    return Math.floor(Math.random() * (max - min)) + min;
-}
-
-function dist(x1, y1, x2, y2) {
-    return Math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2);
-}
+};

@@ -1,15 +1,25 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Color Orbs Game</title>
-  <link rel="stylesheet" href="styles.css">
+    <meta charset="UTF-8">
+    <title>Coop vs. the FUD Monsters</title>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div id="gameContainer"></div>
-  <script src="constants.js"></script>
-  <script src="utils.js"></script>
-  <script src="entities.js"></script>
-  <script src="game.js"></script>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="900" height="480" tabindex="1"></canvas>
+        <div id="mobileControls">
+            <button id="btnLeft">&#8592;</button>
+            <button id="btnRight">&#8594;</button>
+            <button id="btnJump">&#8593;</button>
+            <button id="btnAttack">&#10006;</button>
+        </div>
+    </div>
+    <script src="utils.js"></script>
+    <script src="constants.js"></script>
+    <script src="player.js"></script>
+    <script src="entities.js"></script>
+    <script src="ui.js"></script>
+    <script src="game.js"></script>
 </body>
-</html
+</html>

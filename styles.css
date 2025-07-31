@@ -1,53 +1,72 @@
-html, body {
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  background: linear-gradient(135deg, #25283d 0%, #3c3f58 100%);
-  font-family: 'Segoe UI', Arial, sans-serif;
-  overflow: hidden;
+body {
+    margin: 0;
+    background: linear-gradient(180deg, #353a50 0%, #0e1120 100%);
+    font-family: 'Segoe UI', Arial, sans-serif;
 }
 
 #gameContainer {
-  position: relative;
-  width: 100vw;
-  height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+    width: 900px;
+    margin: 30px auto 0 auto;
+    background: #252540;
+    border-radius: 24px;
+    box-shadow: 0 8px 32px #000a;
+    padding: 0;
+    position: relative;
+    user-select: none;
 }
 
-canvas {
-  display: block;
-  background: radial-gradient(circle at 55% 50%, #454661 60%, #23243a 100%);
-  border-radius: 24px;
-  box-shadow: 0 8px 32px 0 rgba(20,20,35,0.5);
+canvas#gameCanvas {
+    display: block;
+    margin: 0 auto;
+    border-radius: 16px;
+    background: #464d7b linear-gradient(180deg, #5a73b4 0%, #22284a 90%);
+    box-shadow: 0 2px 16px #0008;
+    outline: none;
 }
 
-.menu, .game-over {
-  position: absolute;
-  top: 50%; left: 50%;
-  transform: translate(-50%,-50%);
-  background: rgba(24,26,45,0.98);
-  border-radius: 22px;
-  padding: 34px;
-  color: #fff;
-  text-align: center;
+#mobileControls {
+    display: none;
+    position: absolute;
+    left: 0; right: 0; bottom: 20px;
+    width: 100%;
+    text-align: center;
+    z-index: 10;
 }
 
-.menu h2, .game-over h2 {
-  color: #ffe96e;
+#mobileControls button {
+    margin: 0 8px;
+    padding: 18px 30px;
+    font-size: 2rem;
+    background: linear-gradient(180deg, #88aaff 0%, #3458b0 100%);
+    color: #fff;
+    border: none;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px #0007;
+    outline: none;
+    cursor: pointer;
+    transition: background 0.2s, box-shadow 0.2s;
 }
 
-.menu button, .game-over button {
-  padding: 10px 20px;
-  border: none;
-  border-radius: 5px;
-  background: #ffe96e;
-  color: #2d2e4f;
-  cursor: pointer;
-  transition: background 0.3s;
+#mobileControls button:active {
+    background: #ffed86;
+    color: #222;
+    box-shadow: 0 2px 8px #000a;
 }
 
-.menu button:hover, .game-over button:hover {
-  background: #ffb347;
+/* Responsive for mobile */
+@media (max-width: 1000px) {
+    #gameContainer {
+        width: 100vw;
+        max-width: 100vw;
+        border-radius: 0;
+    }
+    canvas#gameCanvas {
+        width: 100vw !important;
+        height: 60vw !important;
+        max-width: 100vw;
+        max-height: 80vw;
+    }
+    #mobileControls {
+        display: block;
+    }
 }
