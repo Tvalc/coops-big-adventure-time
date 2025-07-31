@@ -9,4 +9,4 @@ This repository contains design documentation for the project.
 - [Level Design Document](./docs/level-design.md)
 
 ---
-*Last updated: 7/29/2025*
+*Last updated: 7/30/2025*
