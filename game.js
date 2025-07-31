@@ -1,178 +1,132 @@
-// =============== GameManager ===============
-window.GameManager = class GameManager {
-  constructor() {
-    this.canvas = document.getElementById('game-canvas');
-    this.ctx = this.canvas.getContext('2d');
-    this.input = new window.InputSystem();
-    this.progression = new window.ProgressionSystem();
-    this.ui = new window.UIManager(this);
+window.Game = class Game {
+    constructor(containerId) {
+        this.container = document.getElementById(containerId);
+        this.canvas = document.createElement('canvas');
+        this.canvas.width = GAME_WIDTH;
+        this.canvas.height = GAME_HEIGHT;
+        this.ctx = this.canvas.getContext('2d');
+        this.container.appendChild(this.canvas);
+        
+        this.state = 'menu'; // 'menu', 'playing', 'gameover'
+        this.score = 0;
 
-    this.player = null;
-    this.enemyManager = null;
-
-    this.state = 'menu'; // menu, playing, gameover
-    this.lastTimestamp = 0;
-
-    // For simple scene backgrounds
-    this.bgColorIdx = 0;
-    this.bgAnimT = 0;
-
-    // === Background image for first scene ===
-    this.bgImage = new window.Image();
-    this.bgImage.src = 'https://dcnmwoxzefwqmvvkpqap.supabase.co/storage/v1/object/public/sprite-studio-exports/0f84fe06-5c42-40c3-b563-1a28d18f37cc/library/BackGround_1_SS_1753769088005.png';
-
-    // Bindings
-    this._boundRender = this.render.bind(this);
-  }
-
-  startGame() {
-    // Reset all game state
-    this.player = new window.Player(120, window.GAME_CONSTANTS.GROUND_Y - window.GAME_CONSTANTS.PLAYER.RADIUS);
-    this.enemyManager = new window.EnemyManager();
-    this.enemyManager.startWave(3, {});
-    this.enemyManager.onWaveEnd = this.onWaveCleared.bind(this);
-
-    this.progression.state.current = { level: 1, stage: 1, scene: 1, wave: 1 };
-    this.state = 'playing';
-    this.ui.clear();
-    this.lastTimestamp = 0;
-    window.requestAnimationFrame(this._boundRender);
-  }
-
-  onWaveCleared() {
-    // Next wave or scene
-    let c = this.progression.state.current;
-    c.wave++;
-    if (c.wave > window.GAME_CONSTANTS.WAVES) {
-      c.wave = 1; c.scene++;
-      // TODO: stage/level advance, boss, reward
-    }
-    // TODO: Boss, upgrades, etc
-    // For now: spawn more enemies
-    let nextN = Math.min(3 + c.wave, 10);
-    this.enemyManager.startWave(nextN, {});
-  }
-
-  render(ts) {
-    if (this.state === 'menu') return; // Not playing
-
-    let dt = (ts - this.lastTimestamp) || 16;
-    this.lastTimestamp = ts;
-
-    // Update
-    if (this.state === 'playing') {
-      this.update(dt);
-      this.draw();
+        this.handleKeyDown = this.handleKeyDown.bind(this);
+        this.handleKeyUp = this.handleKeyUp.bind(this);
+        this.startGame = this.startGame.bind(this);
+        
+        this.showMenu();
     }
 
-    if (this.state === 'playing') window.requestAnimationFrame(this._boundRender);
-  }
-
-  update(dt) {
-    // Player input
-    if (this.input.consumeJump()) this.player.jump();
-    if (this.input.consumeAttack()) {
-      if (this.player.attack(this.enemyManager.enemies)) {
-        // Play hit sound (future)
-      }
-    }
-    // --- Bubble Gun input: consumeShoot() ---
-    if (this.input.consumeShoot()) {
-      this.player.shoot();
+    showMenu() {
+        this.clearUI();
+        this.menuDiv = document.createElement('div');
+        this.menuDiv.className = 'menu';
+        this.menuDiv.innerHTML = `
+            <h2>Color Orbs</h2>
+            <p>Move with <b>Arrow Keys</b>.<br>Collect colored orbs, avoid the walls!</p>
+            <button id="startBtn">Start Game</button>
+        `;
+        this.container.appendChild(this.menuDiv);
+        document.getElementById('startBtn').onclick = this.startGame;
     }
 
-    // Pass both input and world (enemies) to Player
-    this.player.update(this.input, dt, { enemies: this.enemyManager.enemies });
-
-    // Enemies & PowerUps
-    this.enemyManager.update(this.player, dt);
-
-    // Score/currency for defeated
-    let defeated = 0;
-    for (let e of this.enemyManager.enemies) {
-      if (!e.isAlive && !e._scored) {
-        this.player.stats.score += window.GAME_CONSTANTS.SCORE_PER_ENEMY;
-        this.player.stats.currency += window.GAME_CONSTANTS.CURRENCY_PER_ENEMY;
-        e._scored = true;
-        defeated++;
-      }
+    showGameOver() {
+        this.clearUI();
+        const gameOverDiv = document.createElement('div');
+        gameOverDiv.className = 'game-over';
+        gameOverDiv.innerHTML = `
+            <h2>Game Over</h2>
+            <p>Your Score: <b>${this.score}</b></p>
+            <button id="restartBtn">Restart</button>
+        `;
+        this.container.appendChild(gameOverDiv);
+        document.getElementById('restartBtn').onclick = this.startGame;
     }
 
-    // Game over
-    if (this.player.stats.hp <= 0) {
-      this.state = 'gameover';
-      this.ui.showGameOver(this.player.stats.score, () => this.startGame());
-      return;
-    }
-  }
-
-  draw() {
-    // =================== BACKGROUND ===================
-    let c = this.progression.state.current;
-    if (
-      c.level === 1 &&
-      c.stage === 1 &&
-      c.scene === 1 &&
-      this.bgImage.complete
-    ) {
-      // Draw custom image background, stretched to canvas
-      this.ctx.drawImage(
-        this.bgImage,
-        0,
-        0,
-        window.GAME_CONSTANTS.WIDTH,
-        window.GAME_CONSTANTS.HEIGHT
-      );
-    } else {
-      // Existing gradient background for all other scenes
-      this.bgAnimT += 0.009;
-      let bgCols = window.GAME_CONSTANTS.BG_COLORS;
-      let idx = this.bgColorIdx;
-      let nextIdx = (idx+1)%bgCols.length;
-      let grad = this.ctx.createLinearGradient(0,0,0,window.GAME_CONSTANTS.HEIGHT);
-      grad.addColorStop(0, bgCols[idx]);
-      grad.addColorStop(Math.abs(Math.sin(this.bgAnimT))*0.9, bgCols[nextIdx]);
-      grad.addColorStop(1, '#22252e');
-      this.ctx.fillStyle = grad;
-      this.ctx.fillRect(0, 0, window.GAME_CONSTANTS.WIDTH, window.GAME_CONSTANTS.HEIGHT);
+    clearUI() {
+        if (this.menuDiv) this.menuDiv.remove();
     }
 
-    // Platform ground
-    window.Utils.drawRoundedRect(
-      this.ctx,
-      0, window.GAME_CONSTANTS.GROUND_Y+30,
-      window.GAME_CONSTANTS.WIDTH, window.GAME_CONSTANTS.HEIGHT-window.GAME_CONSTANTS.GROUND_Y-30,
-      24, '#18223a', '#223'
-    );
-    this.ctx.save();
-    this.ctx.shadowColor = '#0ff2';
-    this.ctx.shadowBlur = 24;
-    this.ctx.fillStyle = '#2e436e';
-    this.ctx.fillRect(0, window.GAME_CONSTANTS.GROUND_Y, window.GAME_CONSTANTS.WIDTH, 36);
-    this.ctx.restore();
+    startGame() {
+        this.clearUI();
+        this.state = 'playing';
+        this.score = 0;
+        this.player = new window.Player(GAME_WIDTH / 2, GAME_HEIGHT / 2);
+        this.orb = new window.Orb();
+        this.render();
+        window.addEventListener('keydown', this.handleKeyDown);
+        window.addEventListener('keyup', this.handleKeyUp);
+    }
 
-    // Player (includes projectiles)
-    this.player.draw(this.ctx);
+    handleKeyDown(e) {
+        if (this.state !== 'playing') return;
+        switch (e.key) {
+            case "ArrowUp": this.player.vy = -PLAYER_SPEED; break;
+            case "ArrowDown": this.player.vy = PLAYER_SPEED; break;
+            case "ArrowLeft": this.player.vx = -PLAYER_SPEED; break;
+            case "ArrowRight": this.player.vx = PLAYER_SPEED; break;
+        }
+    }
 
-    // Enemies & PowerUps
-    this.enemyManager.draw(this.ctx);
+    handleKeyUp(e) {
+        if (this.state !== 'playing') return;
+        if (["ArrowUp", "ArrowDown"].includes(e.key)) this.player.vy = 0;
+        if (["ArrowLeft", "ArrowRight"].includes(e.key)) this.player.vx = 0;
+    }
 
-    // HUD
-    this.ui.showHUD(this.player.stats, this.progression.state.current);
-  }
+    render() {
+        if (this.state !== 'playing') return;
+
+        this.player.update();
+
+        // Collision: walls
+        if (
+            this.player.x - PLAYER_RADIUS < 0 ||
+            this.player.x + PLAYER_RADIUS > GAME_WIDTH ||
+            this.player.y - PLAYER_RADIUS < 0 ||
+            this.player.y + PLAYER_RADIUS > GAME_HEIGHT
+        ) {
+            this.endGame();
+            return;
+        }
+
+        // Collision: orb
+        if (dist(this.player.x, this.player.y, this.orb.x, this.orb.y) < PLAYER_RADIUS + ORB_RADIUS) {
+            this.score++;
+            this.player.color = this.orb.color;
+            this.orb.spawn();
+        }
+
+        // Draw
+        this.ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+        this.drawOrb();
+        this.drawPlayer();
+        requestAnimationFrame(this.render.bind(this));
+    }
+
+    drawOrb() {
+        this.ctx.beginPath();
+        this.ctx.arc(this.orb.x, this.orb.y, this.orb.radius, 0, Math.PI * 2);
+        this.ctx.fillStyle = this.orb.color;
+        this.ctx.fill();
+    }
+
+    drawPlayer() {
+        this.ctx.beginPath();
+        this.ctx.arc(this.player.x, this.player.y, this.player.radius, 0, Math.PI * 2);
+        this.ctx.fillStyle = this.player.color;
+        this.ctx.fill();
+    }
+
+    endGame() {
+        this.state = 'gameover';
+        window.removeEventListener('keydown', this.handleKeyDown);
+        window.removeEventListener('keyup', this.handleKeyUp);
+        this.showGameOver();
+    }
 };
 
-// ======= Initialization =========
-
-function initGame() {
-  try {
-    window.gameManager = new window.GameManager();
-    // Show menu immediately
-    window.gameManager.ui.showMainMenu();
-  } catch (e) {
-    alert('Game failed to load. See console for details.');
-    console.error(e);
-  }
-}
-
-window.addEventListener('DOMContentLoaded', initGame);
+// Initialize the game
+window.onload = () => {
+    new Game('gameContainer');
+};
