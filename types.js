@@ -1,42 +1,17 @@
-// Type-like JSDoc annotations for clarity
-
 /**
- * @typedef {Object} PlayerStats
- * @property {number} hp
- * @property {number} maxHp
- * @property {number} attack
- * @property {number} defense
- * @property {number} speed
- * @property {number} jump
- * @property {number} currency
- * @property {number} score
+ * @typedef {Object} Player
+ * @property {number} x - The x-coordinate of the player.
+ * @property {number} y - The y-coordinate of the player.
+ * @property {number} radius - The radius of the player.
+ * @property {string} color - The color of the player.
+ * @property {number} vx - The velocity in the x direction.
+ * @property {number} vy - The velocity in the y direction.
  */
 
 /**
- * @typedef {Object} EnemyConfig
- * @property {number} hp
- * @property {number} speed
- * @property {string} color
- * @property {number} attack
- * @property {number} reward
- */
-
-/**
- * @typedef {Object} LevelMeta
- * @property {number} level
- * @property {number} stage
- * @property {number} scene
- * @property {number} wave
- */
-
-/**
- * @typedef {Object} ProgressionState
- * @property {LevelMeta} current
- * @property {number} unlockedLevel
- * @property {Object} upgrades
- * @property {Object} skills
- */
-
-/**
- * @typedef {'heal' | 'attackUp' | 'speedUp' | 'invincible'} PowerUpType
+ * @typedef {Object} Orb
+ * @property {number} x - The x-coordinate of the orb.
+ * @property {number} y - The y-coordinate of the orb.
+ * @property {number} radius - The radius of the orb.
+ * @property {string} color - The color of the orb.
  */
